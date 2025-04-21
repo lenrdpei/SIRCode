@@ -8,7 +8,7 @@ edges (links) are strictly indexed as 1:size(ne(graph)).
 
 using DataFrames
 using CSV
-using LightGraphs
+using Graphs
 using SparseArrays
 
 export end_node, read_graph_from_csv, write_graph_to_csv, undigraph_repr,
