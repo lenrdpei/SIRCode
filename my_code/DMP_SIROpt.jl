@@ -164,7 +164,7 @@ function forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0, βv, μ, opt,
     PS_mgn, PI_mgn, PR_mgn =
         DMP_marginal(T, adj_mat, adj_n, deg, σ0, βv, μ, PS, θ, ϕ, opt)
 
-    obj = sum(1 .- PS_mgn[T+1,])
+    obj = sum(1 .- PS_mgn[T+1, :])
     return obj
 end
 
