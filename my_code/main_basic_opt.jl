@@ -2,10 +2,8 @@ using Pkg
 Pkg.activate("project_env")
 
 include("GraphUtil.jl")
-include("BetaGen.jl")
 include("DMP_SIROpt.jl")
 using .GraphUtil
-using .BetaGen
 using .DMP_SIROpt
 
 using Graphs, Random, CSV, DataFrames
