@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate("project_env")
+
 """Dynamic message-passing on SIR model, proposed in
 Andrey Y. Lokhov et al., Phys. Rev. E 91, 012811, 2015.
 
@@ -14,7 +17,7 @@ Optimization of the SIR model by back-propagation and gradient ascent:
 
 using DataFrames
 using CSV
-using LightGraphs
+using Graphs
 using SparseArrays
 using Random
 using ReverseDiff
@@ -288,15 +291,15 @@ T = 20
 
 λ = 1.
 
-## All nodes to be influenced:
-# PTargets = collect(1:nv(graph))
-# NTargets = []
+# All nodes to be influenced:
+PTargets = collect(1:nv(graph))
+NTargets = []
 
 ## Randomly pick some nodes to be influenced (PTargets), and some other nodes NOT to be influenced (NTargets):
 Random.seed!(110)
-ind = randperm( nv(graph) )
-PTargets = ind[1:50]
-NTargets = ind[51:100]
+# ind = randperm( nv(graph) )
+# PTargets = ind[1:50]
+# NTargets = ind[51:100]
 
 σtot = 5
 o1, o2, σ0 = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ, λ, PTargets, NTargets)
