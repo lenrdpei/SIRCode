@@ -1,7 +1,4 @@
-using Pkg
-Pkg.activate("project_env")
-Pkg.instantiate()
-
+module DMP_SIROpt
 """Dynamic message-passing on SIR model, proposed in
 Andrey Y. Lokhov et al., Phys. Rev. E 91, 012811, 2015.
 
@@ -23,15 +20,14 @@ using SparseArrays
 using Random
 using ReverseDiff
 
-include("GraphUtil.jl")
-# using .GraphUtil
-
+export dynamic_MP, DMP_marginal, forward_obj_func, gradient_descent_over_σ0_multiseed,
+       round_up_σ0
 
 function softmax(h)
     """Softmax function.
     The input h should be a 1d vector."""
     hmax = maximum(h)
-    Ph = exp.( h .- hmax )
+    Ph = exp.(h .- hmax)
     Ph = Ph ./ sum(Ph)
     return Ph
 end
@@ -76,14 +72,14 @@ function dynamic_MP(T, edge_list, adj_mat, adj_n, deg, σ0, βv, μ, opt)
     end
 
     PS = [spzeros(type_of_var, size(adj_mat)...) for t in 1:T+1]
-    θ =  [spzeros(type_of_var, size(adj_mat)...) for t in 1:T+1]
-    ϕ =  [spzeros(type_of_var, size(adj_mat)...) for t in 1:T+1]
+    θ = [spzeros(type_of_var, size(adj_mat)...) for t in 1:T+1]
+    ϕ = [spzeros(type_of_var, size(adj_mat)...) for t in 1:T+1]
 
     ## Initial condition:
     for i in 1:no_of_nodes
         for n in 1:deg[i]
             j = adj_n[i, n]
-            θ[1][i, j] = 1.
+            θ[1][i, j] = 1.0
             ϕ[1][i, j] = σ0[i]
             PS[1][i, j] = (1 - σ0[i])
         end
@@ -93,7 +89,7 @@ function dynamic_MP(T, edge_list, adj_mat, adj_n, deg, σ0, βv, μ, opt)
         for i in 1:no_of_nodes
             for n in 1:deg[i]
                 j = adj_n[i, n]
-                temp = 1.
+                temp = 1.0
                 for m in 1:deg[i]
                     k = adj_n[i, m]
                     if k == j
@@ -103,8 +99,8 @@ function dynamic_MP(T, edge_list, adj_mat, adj_n, deg, σ0, βv, μ, opt)
                     temp *= θ[t][k, i]
                 end
                 PS[t][i, j] = (1 - σ0[i]) * temp
-                ϕ[t][i, j] = (1 - β[i, j] - μ[i] + β[i, j]*μ[i]) * ϕ[t-1][i, j] -
-                                (PS[t][i, j] - PS[t-1][i, j])
+                ϕ[t][i, j] = (1 - β[i, j] - μ[i] + β[i, j] * μ[i]) * ϕ[t-1][i, j] -
+                             (PS[t][i, j] - PS[t-1][i, j])
                 θ[t][i, j] = θ[t-1][i, j] - β[i, j] * ϕ[t-1][i, j]
             end
         end
@@ -131,9 +127,9 @@ function DMP_marginal(T, adj_mat, adj_n, deg, σ0, βv, μ, PS, θ, ϕ, opt)
 
     no_of_nodes = size(adj_mat, 1)
 
-    PS_mgn = zeros(type_of_var, T+1, no_of_nodes)
-    PI_mgn = zeros(type_of_var, T+1, no_of_nodes)
-    PR_mgn = zeros(type_of_var, T+1, no_of_nodes)
+    PS_mgn = zeros(type_of_var, T + 1, no_of_nodes)
+    PI_mgn = zeros(type_of_var, T + 1, no_of_nodes)
+    PR_mgn = zeros(type_of_var, T + 1, no_of_nodes)
 
     ## Initial condition:
     for i in 1:no_of_nodes
@@ -144,7 +140,7 @@ function DMP_marginal(T, adj_mat, adj_n, deg, σ0, βv, μ, PS, θ, ϕ, opt)
 
     for t in 2:T+1
         for i in 1:no_of_nodes
-            temp = 1.
+            temp = 1.0
             for m in 1:deg[i]
                 k = adj_n[i, m]
                 temp *= θ[t][k, i]
@@ -160,7 +156,7 @@ end
 
 
 function forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0, βv, μ, opt,
-            λ, PTargets, NTargets)
+    λ, PTargets, NTargets)
     """Objective function governed by the forward equations.
     PTargets: the set of nodes to be influenced.
     NTargets: the set of nodes Not to be influenced."""
@@ -168,13 +164,13 @@ function forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0, βv, μ, opt,
     PS_mgn, PI_mgn, PR_mgn =
         DMP_marginal(T, adj_mat, adj_n, deg, σ0, βv, μ, PS, θ, ϕ, opt)
 
-    obj = sum( 1 .- PS_mgn[T+1, ] )
+    obj = sum(1 .- PS_mgn[T+1,])
     return obj
 end
 
 
 function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ,
-            λ, PTargets, NTargets)
+    λ, PTargets, NTargets)
     """Gradient descent over initial seed σ0[i], assuming sum(σ0) = σtot.
 
     In this experiment, a reparameterization method is use to enforce the constraint
@@ -196,10 +192,10 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
 
     ## Augmented objective function: L = objf + ϵ * ∑_i log(1 - σ0[i]), as a function of h0
     ϵ = 0.02
-    L_of_h0 = x -> forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(x)*σtot, βv, μ, "sigma0", λ, PTargets, NTargets) +
-                   ϵ * sum( log.( 1 .- softmax(x)*σtot ) )
+    L_of_h0 = x -> forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(x) * σtot, βv, μ, "sigma0", λ, PTargets, NTargets) +
+                   ϵ * sum(log.(1 .- softmax(x) * σtot))
 
-    o1 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(h0)*σtot, βv, μ, "sigma0", λ, PTargets, NTargets)
+    o1 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(h0) * σtot, βv, μ, "sigma0", λ, PTargets, NTargets)
     L = L_of_h0(h0)
 
     ## Perform gradient ascent:
@@ -208,18 +204,18 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
 
         ## Backtracking line search:
         α, γ = 0.3, 0.6     ## parameters for line search
-        s = 20.             ## initial guess of step size
-        L_temp = 0.
+        s = 20.0             ## initial guess of step size
+        L_temp = 0.0
         for inner_step in 1:20
-            h0_temp = h0 + s*∇L
+            h0_temp = h0 + s * ∇L
             σ0_temp = softmax(h0_temp) * σtot
             if maximum(σ0_temp) >= 1    ## To ensure σ0[i] < 1
                 s *= γ
                 continue
             end
 
-            L_temp = L_of_h0(h0 + s*∇L)
-            if L_temp > L + α*s* sum( ∇L .^ 2 )
+            L_temp = L_of_h0(h0 + s * ∇L)
+            if L_temp > L + α * s * sum(∇L .^ 2)
                 L = L_temp
                 break
             else
@@ -227,7 +223,7 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
             end
         end
 
-        h0 += s*∇L
+        h0 += s * ∇L
         σ0 = softmax(h0) * σtot
         ∇L_norm = sum(∇L .^ 2)
         println("At step = $(step), s = $(s), min_σ0 = $(minimum(σ0)), max_σ0 = $(maximum(σ0)), |∇L|^2 = $(∇L_norm), L = $(L_temp).")
@@ -238,7 +234,7 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
 
     end
 
-    o2 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(h0)*σtot, βv, μ, "sigma0", λ, PTargets, NTargets)
+    o2 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(h0) * σtot, βv, μ, "sigma0", λ, PTargets, NTargets)
 
     println("\n")
     println("minimum and maximum of σ0: $(minimum(σ0)), $(maximum(σ0))\n")
@@ -254,73 +250,9 @@ function round_up_σ0(σ0, σtot::Int)
     ind = sortperm(σ0, rev=true)
     set_of_seeds = ind[1:σtot]
     σ0_soln = zeros(length(σ0))
-    σ0_soln[ set_of_seeds ] .= 1         ## set the σ0 value of the seeding nodes to be 1
+    σ0_soln[set_of_seeds] .= 1         ## set the σ0 value of the seeding nodes to be 1
     return set_of_seeds, σ0_soln
 end
 
-## Directory to dump results:
-dir_result = "./results/"
 
-## Artificial networks:
-dir_network = "./artificial_networks/"
-# graph_name = "bt_depth6"                ## DMP should be exact on tree networks
-# graph_name = "star6"
-graph_name = "ER_N100_d5_seed102"
-# graph_name = "rrg_N100_d5_seed100"
-
-
-node_data, edge_data, graph = GraphUtil.read_graph_from_csv(dir_network * graph_name, false)   # an un-directed graph
-if !is_connected(graph)
-    println("The base graph is not connected.")
-end
-max_deg, deg, edge_list, edge_indx, adj_n, adj_e, adj_e_indx, adj_mat, B = GraphUtil.undigraph_repr(graph, edge_data)
-
-no_of_nodes = size(adj_mat, 1)
-no_of_edges = size(edge_list, 1)
-
-@time begin
-
-## Problem parameters:
-βmag = 0.2
-μmag = 1.
-βv = ones(Float64, no_of_edges) * βmag
-μ = ones(Float64, no_of_nodes) * μmag
-
-T = 20
-
-λ = 1.
-
-## All nodes to be influenced:
-# PTargets = collect(1:nv(graph))
-# NTargets = []
-
-## Randomly pick some nodes to be influenced (PTargets), and some other nodes NOT to be influenced (NTargets):
-Random.seed!(110)
-ind = randperm( nv(graph) )
-PTargets = ind[1:50]
-NTargets = ind[51:100]
-
-σtot = 5
-o1, o2, σ0 = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ, λ, PTargets, NTargets)
-set_of_seeds, σ0_soln = round_up_σ0(σ0, σtot)
-
-o3 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0_soln, βv, μ, "sigma0", λ, PTargets, NTargets)
-println("obj after round up: $(o3)\n")
-
-## Trajectories based on σ0_soln:
-PS, θ, ϕ = dynamic_MP(T, edge_list, adj_mat, adj_n, deg, σ0_soln, βv, μ, "sigma0")
-PS_mgn, PI_mgn, PR_mgn =
-    DMP_marginal(T, adj_mat, adj_n, deg, σ0_soln, βv, μ, PS, θ, ϕ, "sigma0")
-
-## save the solution:
-node_types = zeros(Int, no_of_nodes)
-node_types[PTargets] .= 1
-node_types[NTargets] .= -1
-open(dir_result * "sigma0_" * graph_name * ".csv", "w") do io
-    write(io, "node_id,node_type,σ0,σ0_rounded,P_S\n")
-    for i in 1:no_of_nodes
-        write(io, "$i,$(node_types[i]),$(σ0[i]),$(σ0_soln[i]),$(PS_mgn[T+1,i])\n")
-    end
-end
-
-end  ## end of @time
+end # module DMP_SIROpt
