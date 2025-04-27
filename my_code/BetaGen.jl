@@ -1,8 +1,8 @@
 module BetaGen
 
-using Random, LinearAlgebra, Distributions
+using DataFrames, Random, LinearAlgebra, Distributions
 
-export generate_B, generate_beta
+export generate_B, generate_beta, β_to_βv
 
 """
     generate_B(p::Int; use_continuous_B::Bool = false) -> Vector{Float64}
@@ -22,7 +22,7 @@ The vector can be optionally scaled by a random vector of length p.
 """
 function generate_B(
     p::Int;           # feature dimension
-    use_continuous_B::Bool = false
+    use_continuous_B::Bool=false
 )
     B = rand(Bernoulli(0.5), p)                 # Discrete B
     if use_continuous_B
@@ -57,9 +57,9 @@ The generation process includes a non-linear transformation and additive Gaussia
 function generate_beta(
     pattern_B::Vector, # underlying pattern (matrix B)
     num_nodes::Int;    # |V|
-    p::Int = 10,       # feature dimension
-    deg::Int = 2,      # non-linearity degree
-    σ::Float64 = 0.1,  # stddev of additive Gaussian noise
+    p::Int=10,       # feature dimension
+    deg::Int=2,      # non-linearity degree
+    σ::Float64=0.1,  # stddev of additive Gaussian noise
 )
     # 1. Generate design matrix Z ∈ ℝ^{|V|×p}
     Z = randn(num_nodes, p)
@@ -84,6 +84,22 @@ function generate_beta(
     β = sigmoid.(preact)
 
     return Z, β
+end
+
+"""
+Convert node vector β to edge vector βv.
+"""
+function β_to_βv(β::Vector, edge_list::DataFrame)
+
+    no_of_edges = size(edge_list, 1)
+    βv = zeros(Float64, no_of_edges)
+
+    for e in 1:no_of_edges
+        i, j = edge_list[e, :]
+        βv[e] = (β[i] + β[j]) / 2.0
+    end
+
+    return βv
 end
 
 # Example usage
