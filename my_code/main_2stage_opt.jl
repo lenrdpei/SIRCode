@@ -39,7 +39,7 @@ no_of_edges = size(edge_list, 1)
 # Generate design matrx Z and ground truth βv
 # -----------------------------------------------------------------
 feature_p = 20
-instance_num = 10
+instance_num = 1000
 problem_deg = 1
 noise_sigma = 0.1
 
@@ -62,7 +62,7 @@ end
 # Predict βv with Z using MLP
 # -----------------------------------------------------------------
 # train-test split:
-train_ratio = 0.8
+train_ratio = 0.5
 train_size = Int(train_ratio * instance_num)
 test_size = instance_num - train_size
 
@@ -102,30 +102,67 @@ NTargets = []
 
 # -----------------------------------------------------------------
 # Maximize the objective function w.r.t. σ0
+o1_vec = zeros(Float64, test_size)
+o2_vec = zeros(Float64, test_size)
+o3_vec = zeros(Float64, test_size)
+o4_vec = zeros(Float64, test_size)
+o5_vec = zeros(Float64, test_size)
 for _i in 1:test_size
     βv = βv_pred[:, _i]
-    println(typeof(βv))
-    println(size(βv))
-    o1, o2, σ0 = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ, λ, PTargets, NTargets)
-    println("gd passed")
+    βv_truth = βv_test[:, _i]
+    # o1: objective with randomly initialized σ0; o2: objective after optimization
+    o1, o2, σ0 = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ, λ, PTargets, NTargets; verbose=false)
     set_of_seeds, σ0_soln = round_up_σ0(σ0, σtot)
-    println("round up passed")
+    println("o1 with random σ0 and β hat: $(o1)")
+    println("o2 with optimized σ0 and β hat: $(o2)")
 
+    # o3: objective with rounded σ0(β hat) and β hat
     o3 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0_soln, βv, μ, "sigma0", λ, PTargets, NTargets)
-    println("obj after round up: $(o3)\n")
+    println("o3 with rounded σ0(β hat) and β hat: $(o3)")
+
+    # o4: objective with rounded σ0(β hat) and β truth
+    o4 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0_soln, βv_truth, μ, "sigma0", λ, PTargets, NTargets)
+    println("o4 with rounded σ0(β hat) and β truth: $(o4)")
+
+    _, _, σ0_truth = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv_truth, μ, λ, PTargets, NTargets; verbose=false)
+    _, σ0_soln_truth = round_up_σ0(σ0_truth, σtot)
+    # o5: objective with rounded σ0(β truth) and β truth
+    o5 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0_soln_truth, βv_truth, μ, "sigma0", λ, PTargets, NTargets)
+    println("o5 with rounded σ0(β truth) and β truth: $(o5)")
+
+    regret = o5 - o4
+    println("regret o5 - o4: $(regret)")
 
     ## Trajectories based on σ0_soln:
     PS, θ, ϕ = dynamic_MP(T, edge_list, adj_mat, adj_n, deg, σ0_soln, βv, μ, "sigma0")
     PS_mgn, PI_mgn, PR_mgn =
         DMP_marginal(T, adj_mat, adj_n, deg, σ0_soln, βv, μ, PS, θ, ϕ, "sigma0")
 
-    ## save the solution:
-    node_types = zeros(Int, no_of_nodes)
-    open(dir_result * "sigma0_" * graph_name * ".csv", "w") do io
-        write(io, "node_id,node_type,σ0,σ0_rounded,P_S\n")
-        for i in 1:no_of_nodes
-            write(io, "$i,$(node_types[i]),$(σ0[i]),$(σ0_soln[i]),$(PS_mgn[T+1,i])\n")
-        end
+    # save objective values:
+    o1_vec[_i] = o1
+    o2_vec[_i] = o2
+    o3_vec[_i] = o3
+    o4_vec[_i] = o4
+    o5_vec[_i] = o5
+    # ## save the solution:
+    # node_types = zeros(Int, no_of_nodes)
+    # open(dir_result * "sigma0_" * graph_name * ".csv", "w") do io
+    #     write(io, "node_id,node_type,σ0,σ0_rounded,P_S\n")
+    #     for i in 1:no_of_nodes
+    #         write(io, "$i,$(node_types[i]),$(σ0[i]),$(σ0_soln[i]),$(PS_mgn[T+1,i])\n")
+    #     end
+    # end
+    # open(dir_result * graph_name * "/test_$(_i)" * ".csv", "w") do io
+    #     write(io, "node_id,node_type,σ0,σ0_rounded,P_S\n")
+    #     for i in 1:no_of_nodes
+    #         write(io, "$i,$(node_types[i]),$(σ0[i]),$(σ0_soln[i]),$(PS_mgn[T+1,i])\n")
+    #     end
+    # end
+end
+open(dir_result * graph_name * "_obj.csv", "w") do io
+    write(io, "o1,o2,o3,o4,o5\n")
+    for i in 1:test_size
+        write(io, "$(o1_vec[i]),$(o2_vec[i]),$(o3_vec[i]),$(o4_vec[i]),$(o5_vec[i])\n")
     end
 end
 

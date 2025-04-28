@@ -21,7 +21,7 @@ using Random
 using ReverseDiff
 
 export dynamic_MP, DMP_marginal, forward_obj_func, gradient_descent_over_σ0_multiseed,
-       round_up_σ0
+    round_up_σ0
 
 function softmax(h)
     """Softmax function.
@@ -170,7 +170,7 @@ end
 
 
 function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ,
-    λ, PTargets, NTargets)
+    λ, PTargets, NTargets; verbose=true)
     """Gradient descent over initial seed σ0[i], assuming sum(σ0) = σtot.
 
     In this experiment, a reparameterization method is use to enforce the constraint
@@ -226,7 +226,9 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
         h0 += s * ∇L
         σ0 = softmax(h0) * σtot
         ∇L_norm = sum(∇L .^ 2)
-        println("At step = $(step), s = $(s), min_σ0 = $(minimum(σ0)), max_σ0 = $(maximum(σ0)), |∇L|^2 = $(∇L_norm), L = $(L_temp).")
+        if verbose
+            println("At step = $(step), s = $(s), min_σ0 = $(minimum(σ0)), max_σ0 = $(maximum(σ0)), |∇L|^2 = $(∇L_norm), L = $(L_temp).")
+        end
 
         if ∇L_norm < 1e-6
             break
@@ -236,10 +238,12 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
 
     o2 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(h0) * σtot, βv, μ, "sigma0", λ, PTargets, NTargets)
 
-    println("\n")
-    println("minimum and maximum of σ0: $(minimum(σ0)), $(maximum(σ0))\n")
-    println("sum σ0 before and after optimization: $(σtot), $(sum(σ0))\n")
-    println("obj before and after optimization: $(o1), $(o2)\n")
+    if verbose
+        println("\n")
+        println("minimum and maximum of σ0: $(minimum(σ0)), $(maximum(σ0))\n")
+        println("sum σ0 before and after optimization: $(σtot), $(sum(σ0))\n")
+        # println("obj before and after optimization: $(o1), $(o2)\n")
+    end
 
     return o1, o2, σ0
 end
