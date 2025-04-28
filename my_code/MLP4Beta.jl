@@ -45,7 +45,7 @@ function train_mlp(Z::Array{Float32, 3}, β::Array{Float32, 2}; epochs=100, lr=0
     loss_fn = Flux.Losses.mse
 
     # Define optimizer
-    opt_state = Flux.setup(Adam(), model)
+    opt_state = Flux.setup(Adam(lr), model)
 
     losses = Float64[]
 

@@ -39,18 +39,19 @@ no_of_edges = size(edge_list, 1)
 # Generate design matrx Z and ground truth βv
 # -----------------------------------------------------------------
 feature_p = 20
-instance_num = 1000
-problem_deg = 1
-noise_sigma = 0.1
+instance_num = 200
+problem_deg = 3
+noise_sigma = 1.0
+offset_c = -1.5
 
-B = generate_B(feature_p; use_continuous_B=true)
+B = generate_B(feature_p; use_continuous_B=false)
 
 Z = zeros(Float64, no_of_nodes, feature_p, instance_num)
 β_grd = zeros(Float64, no_of_nodes, instance_num)
 βv_grd = zeros(Float64, no_of_edges, instance_num)
 for _i in 1:instance_num
     # Z, β_node = generate_beta(B, no_of_nodes; p=feature_p, deg=2, σ=0.1)
-    Z[:, :, _i], β_grd[:, _i] = generate_beta(B, no_of_nodes; p=feature_p, deg=problem_deg, σ=noise_sigma)
+    Z[:, :, _i], β_grd[:, _i] = generate_beta(B, no_of_nodes; p=feature_p, deg=problem_deg, σ=noise_sigma, offset_c=offset_c)
     βv_grd[:, _i] = β_to_βv(β_grd[:, _i], edge_list)  # convert node vector to edge vector
     # for e in 1:no_of_edges
     #     i, j = edge_list[e, :]
@@ -74,7 +75,7 @@ Z_test = Z[:, :, (train_size+1):instance_num]
 βv_test = βv_grd[:, (train_size+1):instance_num]
 
 # prediction with MLP:
-model = train_mlp(Float32.(Z_train), Float32.(β_train); epochs=500, lr=0.01)
+model = train_mlp(Float32.(Z_train), Float32.(β_train); epochs=Int(10000/(instance_num*(1-train_ratio))), lr=0.001)
 β_pred = [model(Z_test[:, :, i]') for i in 1:test_size]
 β_pred = vcat(β_pred...)'  # (|V|, test_size)
 βv_pred = zeros(Float64, no_of_edges, test_size)

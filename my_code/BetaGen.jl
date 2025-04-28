@@ -60,6 +60,7 @@ function generate_beta(
     p::Int=10,       # feature dimension
     deg::Int=2,      # non-linearity degree
     σ::Float64=0.1,  # stddev of additive Gaussian noise
+    offset_c::Float64=-1.0, # offset from the origin
 )
     # 1. Generate design matrix Z ∈ ℝ^{|V|×p}
     Z = randn(num_nodes, p)
@@ -72,8 +73,8 @@ function generate_beta(
     # end
     B = pattern_B
 
-    # 3. Choose c = -0.5 * sqrt(p) to center output
-    c = -0.5 * sqrt(p)
+    # 3. Choose c
+    c = offset_c
 
     # 4. Additive Gaussian noise ξ ∈ ℝ^{|V|}
     ξ = rand(MvNormal(zeros(num_nodes), σ^2 * I))
