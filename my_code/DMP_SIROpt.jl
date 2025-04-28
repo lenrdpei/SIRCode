@@ -193,7 +193,7 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
     ## Augmented objective function: L = objf + ϵ * ∑_i log(1 - σ0[i]), as a function of h0
     ϵ = 0.02
     L_of_h0 = x -> forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(x) * σtot, βv, μ, "sigma0", λ, PTargets, NTargets) +
-                   ϵ * sum(log.(1 .- softmax(x) * σtot))
+                   ϵ * sum(log.(1 .- clamp.(softmax(x) * σtot, eps(), 1 - eps())))
 
     o1 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, softmax(h0) * σtot, βv, μ, "sigma0", λ, PTargets, NTargets)
     L = L_of_h0(h0)
