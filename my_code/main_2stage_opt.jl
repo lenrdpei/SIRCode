@@ -39,10 +39,13 @@ no_of_edges = size(edge_list, 1)
 # Generate design matrx Z and ground truth βv
 # -----------------------------------------------------------------
 feature_p = 20
-instance_num = 200
 problem_deg = 3
 noise_sigma = 1.0
 offset_c = -1.5
+
+train_size = 100
+test_size = 1000
+instance_num = train_size + test_size
 
 B = generate_B(feature_p; use_continuous_B=false)
 
@@ -63,10 +66,6 @@ end
 # Predict βv with Z using MLP
 # -----------------------------------------------------------------
 # train-test split:
-train_ratio = 0.5
-train_size = Int(train_ratio * instance_num)
-test_size = instance_num - train_size
-
 Z_train = Z[:, :, 1:train_size]
 Z_test = Z[:, :, (train_size+1):instance_num]
 β_train = β_grd[:, 1:train_size]
@@ -75,7 +74,7 @@ Z_test = Z[:, :, (train_size+1):instance_num]
 βv_test = βv_grd[:, (train_size+1):instance_num]
 
 # prediction with MLP:
-model = train_mlp(Float32.(Z_train), Float32.(β_train); epochs=Int(10000/(instance_num*(1-train_ratio))), lr=0.001)
+model = train_mlp(Float32.(Z_train), Float32.(β_train); epochs=Int(10000/train_size), lr=0.001)
 β_pred = [model(Z_test[:, :, i]') for i in 1:test_size]
 β_pred = vcat(β_pred...)'  # (|V|, test_size)
 βv_pred = zeros(Float64, no_of_edges, test_size)
@@ -160,7 +159,7 @@ for _i in 1:test_size
     #     end
     # end
 end
-open(dir_result * graph_name * "_obj.csv", "w") do io
+open(dir_result * graph_name * "_obj_test$(test_size)" * ".csv", "w") do io
     write(io, "o1,o2,o3,o4,o5\n")
     for i in 1:test_size
         write(io, "$(o1_vec[i]),$(o2_vec[i]),$(o3_vec[i]),$(o4_vec[i]),$(o5_vec[i])\n")
