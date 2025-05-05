@@ -13,11 +13,13 @@ using Graphs, Random, CSV, DataFrames
 dir_result = "./results/"
 
 ## Artificial networks:
-dir_network = "./artificial_networks/"
+# dir_network = "./artificial_networks/"
 # graph_name = "bt_depth6"                ## DMP should be exact on tree networks
 # graph_name = "star6"
-graph_name = "ER_N100_d5_seed102"
+# graph_name = "ER_N100_d5_seed102"
 # graph_name = "rrg_N100_d5_seed100"
+dir_network = "./human_contact_networks/"
+graph_name = "US_high_school_2010"
 
 
 node_data, edge_data, graph = GraphUtil.read_graph_from_csv(dir_network * graph_name, false)   # an un-directed graph
@@ -44,7 +46,7 @@ noise_sigma = 1.0
 offset_c = -1.5
 
 train_size = 100
-test_size = 1000
+test_size = 10
 instance_num = train_size + test_size
 
 B = generate_B(feature_p; use_continuous_B=false)
@@ -74,7 +76,7 @@ Z_test = Z[:, :, (train_size+1):instance_num]
 βv_test = βv_grd[:, (train_size+1):instance_num]
 
 # prediction with MLP:
-model = train_mlp(Float32.(Z_train), Float32.(β_train); epochs=Int(10000/train_size), lr=0.001)
+model = train_mlp(Float32.(Z_train), Float32.(β_train); epochs=Int(20000/train_size), lr=0.001)
 β_pred = [model(Z_test[:, :, i]') for i in 1:test_size]
 β_pred = vcat(β_pred...)'  # (|V|, test_size)
 βv_pred = zeros(Float64, no_of_edges, test_size)
@@ -111,7 +113,7 @@ for _i in 1:test_size
     βv = βv_pred[:, _i]
     βv_truth = βv_test[:, _i]
     # o1: objective with randomly initialized σ0; o2: objective after optimization
-    o1, o2, σ0 = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ, λ, PTargets, NTargets; verbose=false)
+    o1, o2, σ0 = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ, λ, PTargets, NTargets; verbose=false, max_iter=60)
     set_of_seeds, σ0_soln = round_up_σ0(σ0, σtot)
     println("o1 with random σ0 and β hat: $(o1)")
     println("o2 with optimized σ0 and β hat: $(o2)")
@@ -124,7 +126,7 @@ for _i in 1:test_size
     o4 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0_soln, βv_truth, μ, "sigma0", λ, PTargets, NTargets)
     println("o4 with rounded σ0(β hat) and β truth: $(o4)")
 
-    _, _, σ0_truth = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv_truth, μ, λ, PTargets, NTargets; verbose=false)
+    _, _, σ0_truth = gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv_truth, μ, λ, PTargets, NTargets; verbose=false, max_iter=60)
     _, σ0_soln_truth = round_up_σ0(σ0_truth, σtot)
     # o5: objective with rounded σ0(β truth) and β truth
     o5 = forward_obj_func(T, edge_list, adj_mat, adj_n, deg, σ0_soln_truth, βv_truth, μ, "sigma0", λ, PTargets, NTargets)
@@ -159,7 +161,7 @@ for _i in 1:test_size
     #     end
     # end
 end
-open(dir_result * graph_name * "_obj_test$(test_size)" * ".csv", "w") do io
+open(dir_result * graph_name * "_obj_test$(test_size)_maxiter60" * ".csv", "w") do io
     write(io, "o1,o2,o3,o4,o5\n")
     for i in 1:test_size
         write(io, "$(o1_vec[i]),$(o2_vec[i]),$(o3_vec[i]),$(o4_vec[i]),$(o5_vec[i])\n")
