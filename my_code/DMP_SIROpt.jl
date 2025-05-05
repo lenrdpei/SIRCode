@@ -170,7 +170,7 @@ end
 
 
 function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σtot, T, βv, μ,
-    λ, PTargets, NTargets; verbose=true)
+    λ, PTargets, NTargets; verbose=true, max_iter=60)
     """Gradient descent over initial seed σ0[i], assuming sum(σ0) = σtot.
 
     In this experiment, a reparameterization method is use to enforce the constraint
@@ -199,7 +199,7 @@ function gradient_descent_over_σ0_multiseed(edge_list, adj_mat, adj_n, deg, σt
     L = L_of_h0(h0)
 
     ## Perform gradient ascent:
-    for step in 1:60
+    for step in 1:max_iter
         ∇L = ReverseDiff.gradient(L_of_h0, h0)
 
         ## Backtracking line search:
